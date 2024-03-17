@@ -7,7 +7,7 @@ int main(int argc, char* argv[]) {
     int K, m;
 
     if(argc != 4) {
-        std::cout << "Usage: " << argv[0] << " image.pgm nb_superpîxels max_color_distance\n";
+        std::cout << "Usage: " << argv[0] << " image.ppm nb_superpîxels max_color_distance\n";
         exit(EXIT_FAILURE);
     }
 
