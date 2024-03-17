@@ -14,12 +14,7 @@ int main(int argc, char* argv[]) {
     sscanf(argv[1], "%s", filename);
     sscanf(argv[2], "%d", &K);
     sscanf(argv[3], "%d", &m);
-
-    if(!(K == pow(4, (int)(log(K)/log(4)) && K != 0))) {
-        std::cout << "The number of superpixels should be a power of 4.\n";
-        exit(EXIT_FAILURE);
-    }
-
+    
     ImageBase src;
     src.load(filename);
 
