@@ -51,7 +51,7 @@ double distance(ClusterCenter, PixelLAB, int, int, int, int);
 // Regroups the pixels of an image into superpixels using the SLIC algorithm
 // - Return a 2D array of labels, pixel(i, j) is contained in the superpixel labels[i][j]
 // - Takes an images src, k the number of the superpixels and m the user defined max color distance
-int* SLIC(ImageBase&, int, int);
+int* SLIC(ImageBase&, int, int, std::vector<PixelLAB>&);
 
 void superpixels(ImageBase&, int[], int);
-void draw_regions(ImageBase&, int[], int, int);
+void draw_regions(ImageBase&, int[], std::vector<PixelLAB>&, int, int);

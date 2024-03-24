@@ -22,3 +22,4 @@ PixelLAB operator+(const PixelLAB& lhs, const PixelLAB& rhs);
 PixelLAB operator-(const PixelLAB& lhs, const PixelLAB& rhs);
 
 PixelLAB fromRGB(unsigned int, unsigned int, unsigned int);
+void fromLAB(PixelLAB, uint&, uint&, uint&);

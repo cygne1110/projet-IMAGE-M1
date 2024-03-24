@@ -61,13 +61,13 @@ double distance2(PixelLAB p1, PixelLAB p2) {
 
 }
 
-int* SLIC(ImageBase &src, int k, int m) {
+int* SLIC(ImageBase &src, int k, int m, std::vector<PixelLAB>& res_clusters) {
     
     // Initialization
     int height = src.getHeight();
     int width = src.getWidth();
     int N = src.getHeight()*src.getWidth();
-    int S = floor(sqrt((double)N/k)); // I think that this needs to be a power of 2 to work
+    int S = ceil(sqrt((double)N/k));
 
     int* labels = new int[N];
     double* distances = new double[N];
@@ -208,7 +208,7 @@ int* SLIC(ImageBase &src, int k, int m) {
 
         }
 
-        std::cout << "Iteration " << iter << ", max error: " << max_error << "\n";
+        // std::cout << "Iteration " << iter << ", max error: " << max_error << "\n";
         iter++;
 
     } while(max_error > MINCONV && iter < 15);
@@ -256,6 +256,10 @@ int* SLIC(ImageBase &src, int k, int m) {
         }
     } while(orphan);
 
+    for(int i = 0; i < k; i++) {
+        res_clusters.push_back(centers[i].color);
+    }
+
     delete [] centers;
     delete [] imageLAB;
     delete [] distances;
@@ -289,20 +293,25 @@ void superpixels(ImageBase &src, int labels[], int N) {
 
 }
 
-void draw_regions(ImageBase &src, int labels[], int N, int k) {
+void draw_regions(ImageBase &src, int labels[], std::vector<PixelLAB>& clusters, int N, int k) {
 
     int width = src.getWidth();
     int height = src.getHeight();
 
-    ImageBase res(width, height, false);
+    ImageBase res(width, height, true);
 
     for(int i = 0; i < height; i++) {
 
-        for(int j = 0; j < width-1; j++) {
+        for(int j = 0; j < width; j++) {
 
             int id = idx(i, j, width);
 
-            res[i][j] = (labels[id]*255)/k;
+            uint r, g, b;
+            fromLAB(clusters[labels[id]], r, g, b);
+
+            res[i*3][j*3] = r;
+            res[i*3][j*3+1] = g;
+            res[i*3][j*3+2] = b;
 
         }
 

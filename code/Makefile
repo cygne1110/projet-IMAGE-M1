@@ -1,5 +1,5 @@
 CC = g++
-CPPFLAGS = -Wall -Ofast -Wno-write-strings -g
+CPPFLAGS = -Wall -Ofast -Wno-write-strings
 
 LIBFLAGS =
 LINKFLAGS = 
