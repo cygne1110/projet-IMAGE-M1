@@ -55,3 +55,4 @@ int* SLIC(ImageBase&, int, int, std::vector<PixelLAB>&);
 
 void superpixels(ImageBase&, int[], int);
 void draw_regions(ImageBase&, int[], std::vector<PixelLAB>&, int, int);
+void get_compressed(ImageBase &src, int labels[], std::vector<PixelLAB>& clusters, int N, int k, ImageBase &res);

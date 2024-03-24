@@ -293,6 +293,30 @@ void superpixels(ImageBase &src, int labels[], int N) {
 
 }
 
+void get_compressed(ImageBase &src, int labels[], std::vector<PixelLAB>& clusters, int N, int k, ImageBase &res) {
+
+    int width = src.getWidth();
+    int height = src.getHeight();
+
+    for(int i = 0; i < height; i++) {
+
+        for(int j = 0; j < width; j++) {
+
+            int id = idx(i, j, width);
+
+            uint r, g, b;
+            fromLAB(clusters[labels[id]], r, g, b);
+
+            res[i*3][j*3] = r;
+            res[i*3][j*3+1] = g;
+            res[i*3][j*3+2] = b;
+
+        }
+
+    }
+
+}
+
 void draw_regions(ImageBase &src, int labels[], std::vector<PixelLAB>& clusters, int N, int k) {
 
     int width = src.getWidth();

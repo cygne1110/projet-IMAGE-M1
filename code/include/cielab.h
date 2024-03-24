@@ -3,6 +3,7 @@
 #include <limits>
 #include <iostream>
 #include <cmath>
+#include <colorm.h>
 
 struct PixelLAB {
 
