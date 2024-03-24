@@ -1,7 +1,7 @@
 
 #include <stdio.h>
 #include <iostream>
-#include "include/image_ppm.h"
+#include "image_ppm.h"
 #include "Vec3.h"
 #include <vector>
 
