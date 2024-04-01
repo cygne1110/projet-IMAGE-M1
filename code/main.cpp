@@ -142,7 +142,7 @@ int main(int argc, char* argv[]) {
         draw_regions(src, labels, centers, N, K);
 
         // Fusionne les superpixels similaires
-        std::vector<ClusterCenter> mergedCenters = mergeSuperpixels(labels, convert_to_cluster_centers(centers).data(), 10, N);
+        std::vector<ClusterCenter> mergedCenters = mergeSuperpixels(labels, convert_to_cluster_centers(centers).data(), 2, N);
 
         // Fonction pour dessiner les clusters des superpixels fusionnés
         draw_merged_regions(src, labels, mergedCenters, N, K);
