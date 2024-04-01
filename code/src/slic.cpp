@@ -1,15 +1,24 @@
 #include "slic.h"
 #include "cielab.h"
 
-int idx(int i, int j, int w) {
-    return i*w+j;
-}
-
 std::ostream& operator<<(std::ostream& os, const ClusterCenter& obj) {
 
     os << obj.color << " " << obj.x << " " << obj.y;
     return os;
 
+}
+
+bool operator==(const PixelLAB& lhs, const PixelLAB& rhs) {
+    return lhs.l == rhs.l && lhs.a == rhs.a && lhs.b == rhs.b;
+}
+
+
+bool operator==(const ClusterCenter& lhs, const ClusterCenter& rhs) {
+    return lhs.color == rhs.color && lhs.x == rhs.x && lhs.y == rhs.y;
+}
+
+int idx(int i, int j, int w) {
+    return i*w+j;
 }
 
 PixelLAB operator+(const PixelLAB& lhs, const PixelLAB& rhs) {
@@ -260,12 +269,37 @@ int* SLIC(ImageBase &src, int k, int m, std::vector<PixelLAB>& res_clusters) {
         res_clusters.push_back(centers[i].color);
     }
 
+    // Fusion des superpixels similaires
+    std::vector<ClusterCenter> mergedCenters = mergeSuperpixels(labels, centers, 10, N);
+
+    // Ajout des centres fusionnés à res_clusters
+    for (const auto& center : mergedCenters) {
+        res_clusters.push_back(center.color);
+    }
+
+    // Créer un tableau pour stocker les labels des superpixels fusionnés
+    int* merged_labels = new int[N];
+
+    // Remplacer les labels originaux par les labels des superpixels fusionnés
+    for (int i = 0; i < N; ++i) {
+        int label = labels[i];
+        if (merged_labels[label] == -1) {
+            // Trouver le label correspondant dans les centres fusionnés
+            for (size_t j = 0; j < mergedCenters.size(); ++j) {
+                if (centers[label] == mergedCenters[j]) {
+                    merged_labels[label] = static_cast<int>(j); // Utiliser l'index dans les centres fusionnés comme label
+                    break;
+                }
+            }
+        }
+    }
+
     delete [] centers;
     delete [] imageLAB;
     delete [] distances;
     delete [] clusters;
-    return labels;
 
+    return merged_labels;
 }
 
 void superpixels(ImageBase &src, int labels[], int N) {
@@ -343,4 +377,75 @@ void draw_regions(ImageBase &src, int labels[], std::vector<PixelLAB>& clusters,
 
     res.save("out/regions.ppm");
 
+}
+
+// Method to merge similar superpixels
+std::vector<ClusterCenter> mergeSuperpixels(int* labels, ClusterCenter* centers, double threshold, int N) {
+    std::vector<std::vector<int>> mergedClusters; // Stocke les indices des superpixels fusionnés
+    std::vector<bool> merged(N, false); // Indique si un superpixel a été fusionné
+
+    for (int i = 0; i < N; ++i) {
+        if (!merged[i]) {
+            std::vector<int> mergedCluster; // Stocke les indices des superpixels fusionnés dans cette itération
+            mergedCluster.push_back(i); // Ajoute le superpixel actuel au cluster fusionné
+            merged[i] = true; // Marque le superpixel comme fusionné
+
+            // Parcourez les superpixels restants pour voir s'ils sont similaires
+            for (int j = i + 1; j < N; ++j) {
+                // Vérifiez la similarité entre les superpixels
+                if (!merged[j] && distance2(centers[labels[i]], centers[labels[j]]) < threshold) {
+                    mergedCluster.push_back(j); // Ajoute le superpixel à ce cluster fusionné
+                    merged[j] = true; // Marque le superpixel comme fusionné
+                }
+            }
+
+            // Ajoute le cluster fusionné à la liste des clusters fusionnés
+            mergedClusters.push_back(mergedCluster);
+        }
+    }
+
+    // Fusionne les superpixels en utilisant les moyennes des couleurs et des positions
+    std::vector<ClusterCenter> mergedCenters;
+    for (const auto& mergedCluster : mergedClusters) {
+        ClusterCenter mergedCenter = ClusterCenter(PixelLAB(0., 0., 0.), 0., 0.);
+
+        for (int idx : mergedCluster) {
+            mergedCenter.color.l += centers[labels[idx]].color.l;
+            mergedCenter.color.a += centers[labels[idx]].color.a;
+            mergedCenter.color.b += centers[labels[idx]].color.b;
+            mergedCenter.x += centers[labels[idx]].x;
+            mergedCenter.y += centers[labels[idx]].y;
+        }
+
+        mergedCenter.color.l /= mergedCluster.size();
+        mergedCenter.color.a /= mergedCluster.size();
+        mergedCenter.color.b /= mergedCluster.size();
+        mergedCenter.x /= mergedCluster.size();
+        mergedCenter.y /= mergedCluster.size();
+
+        mergedCenters.push_back(mergedCenter);
+    }
+
+    return mergedCenters;
+}
+
+void draw_merged_regions(ImageBase &src, int labels[], std::vector<ClusterCenter>& mergedCenters, int N, int K) {
+    int width = src.getWidth();
+    int height = src.getHeight();
+
+    ImageBase res(width, height, true);
+
+    for(int i = 0; i < height; i++) {
+        for(int j = 0; j < width; j++) {
+            int id = idx(i, j, width);
+            uint r, g, b;
+            int label = labels[id];
+            fromLAB(mergedCenters[label].color, r, g, b);
+            res[i*3][j*3] = r;
+            res[i*3][j*3+1] = g;
+            res[i*3][j*3+2] = b;
+        }
+    }
+
+    res.save("out/merged_regions.ppm");
 }

@@ -33,6 +33,17 @@ double PSNR(ImageBase& i1, ImageBase& i2) {
 
 }
 
+// Convertir std::vector<PixelLAB> en ClusterCenter*
+std::vector<ClusterCenter> convert_to_cluster_centers(const std::vector<PixelLAB>& pixels) {
+    std::vector<ClusterCenter> centers;
+    for (const auto& pixel : pixels) {
+        // Créer un ClusterCenter à partir de chaque PixelLAB et l'ajouter à la liste des centres
+        centers.push_back(ClusterCenter(pixel, 0, 0)); // Assumer que les coordonnées x et y sont 0 pour l'instant
+    }
+    return centers;
+}
+
+
 int main(int argc, char* argv[]) {
 
     char filename[256];
@@ -130,6 +141,13 @@ int main(int argc, char* argv[]) {
         superpixels(src, labels, N);
         draw_regions(src, labels, centers, N, K);
 
+        // Fusionne les superpixels similaires
+        std::vector<ClusterCenter> mergedCenters = mergeSuperpixels(labels, convert_to_cluster_centers(centers).data(), 10, N);
+
+        // Fonction pour dessiner les clusters des superpixels fusionnés
+        draw_merged_regions(src, labels, mergedCenters, N, K);
+        
+        
         src.save("out/test.ppm");
 
         delete [] labels;

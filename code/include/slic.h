@@ -44,6 +44,8 @@ struct ClusterCenter {
 };
 
 std::ostream& operator<<(std::ostream& os, const PixelLAB& obj);
+bool operator==(const PixelLAB& lhs, const PixelLAB& rhs);
+bool operator==(const ClusterCenter& lhs, const ClusterCenter& rhs);
 
 // Computes the distance between two CIELAB pixels for SLIC
 double distance(ClusterCenter, PixelLAB, int, int, int, int);
@@ -55,4 +57,6 @@ int* SLIC(ImageBase&, int, int, std::vector<PixelLAB>&);
 
 void superpixels(ImageBase&, int[], int);
 void draw_regions(ImageBase&, int[], std::vector<PixelLAB>&, int, int);
+void draw_merged_regions(ImageBase &src, int labels[], std::vector<ClusterCenter>& mergedCenters, int N, int K);
 void get_compressed(ImageBase &src, int labels[], std::vector<PixelLAB>& clusters, int N, int k, ImageBase &res);
+std::vector<ClusterCenter> mergeSuperpixels(int* labels, ClusterCenter* centers, double threshold, int N);
