@@ -70,7 +70,7 @@ int main(int argc, char* argv[]) {
 
             int m = 50;
             std::vector<PixelLAB> centers;
-            int* labels = SLIC(src, K, m, centers);
+            int* labels = ASLIC(src, K, centers);
             get_compressed(src, labels, centers, size, K, res);
             double psnr = PSNR(src, res);
 
@@ -116,7 +116,7 @@ int main(int argc, char* argv[]) {
         #ifdef CHRONO
         auto start = std::chrono::system_clock::now();
         #endif
-        int* labels = SLIC(src, K, m, centers);
+        int* labels = SLICO(src, K, centers);
         #ifdef CHRONO
         auto end = std::chrono::system_clock::now();
         auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);

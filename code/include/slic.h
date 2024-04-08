@@ -47,11 +47,14 @@ std::ostream& operator<<(std::ostream& os, const PixelLAB& obj);
 
 // Computes the distance between two CIELAB pixels for SLIC
 double distance(ClusterCenter, PixelLAB, int, int, int, int);
+double distance(ClusterCenter C, PixelLAB i, int _x, int _y, double S, double m, double &tmp_color, double &tmp_space);
 
 // Regroups the pixels of an image into superpixels using the SLIC algorithm
 // - Return a 2D array of labels, pixel(i, j) is contained in the superpixel labels[i][j]
 // - Takes an images src, k the number of the superpixels and m the user defined max color distance
 int* SLIC(ImageBase&, int, int, std::vector<PixelLAB>&);
+int* ASLIC(ImageBase &src, int k, std::vector<PixelLAB>& res_clusters);
+int* SLICO(ImageBase &src, int k, std::vector<PixelLAB>& res_clusters);
 
 void superpixels(ImageBase&, int[], int);
 void draw_regions(ImageBase&, int[], std::vector<PixelLAB>&, int, int);

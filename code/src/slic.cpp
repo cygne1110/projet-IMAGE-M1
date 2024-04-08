@@ -39,6 +39,23 @@ double distance(ClusterCenter C, PixelLAB i, int _x, int _y, int S, int m) {
 
 }
 
+double distance(ClusterCenter C, PixelLAB i, int _x, int _y, double S, double m, double &tmp_color, double &tmp_space) {
+
+    double l = C.color.l - i.l;
+    double a = C.color.a - i.a;
+    double b = C.color.b - i.b;
+    double x = C.x - _x;
+    double y = C.y - _y;
+
+    double color_distance = sqrt(l*l + a*a + b*b);
+    if(color_distance > tmp_color) tmp_color = color_distance;
+    double spatial_distance = sqrt(x*x + y*y);
+    if(spatial_distance > tmp_space) tmp_space = spatial_distance;
+
+    return sqrt(color_distance*color_distance + (spatial_distance/S)*(spatial_distance/S)*m*m);
+
+}
+
 double distance2(ClusterCenter c1, ClusterCenter c2) {
 
     double l = c1.color.l - c2.color.l;
@@ -242,6 +259,438 @@ int* SLIC(ImageBase &src, int k, int m, std::vector<PixelLAB>& res_clusters) {
                 for(int j = 0; j < size; j++) {
 
                     double dist = distance(centers[neighbors[j]], imageLAB[i], x, y, S, m);
+                    if(dist < min) {
+                        min = dist;
+                        min_label = neighbors[j];
+                    }
+
+                }
+
+                labels[i] = min_label;
+
+            }
+
+        }
+    } while(orphan);
+
+    for(int i = 0; i < k; i++) {
+        res_clusters.push_back(centers[i].color);
+    }
+
+    delete [] centers;
+    delete [] imageLAB;
+    delete [] distances;
+    delete [] clusters;
+    return labels;
+
+}
+
+int* ASLIC(ImageBase &src, int k, std::vector<PixelLAB>& res_clusters) {
+
+    // Initialization
+    int height = src.getHeight();
+    int width = src.getWidth();
+    int N = src.getHeight()*src.getWidth();
+    int S = ceil(sqrt((double)N/k));
+
+    int* labels = new int[N];
+    double* distances = new double[N];
+    PixelLAB* imageLAB = new PixelLAB[N];
+    ClusterCenter* centers = new ClusterCenter[k];
+    std::vector<int>* clusters = new std::vector<int>[k];
+
+    memset(labels, -1, N*sizeof(int));
+
+    // CIELAB image from RGB image
+    for(int i = 0; i < height; i++) {
+        for(int j = 0; j < width; j++) {
+            int r = src[i*3][j*3];
+            int g = src[i*3][j*3+1];
+            int b = src[i*3][j*3+2];
+            imageLAB[idx(i, j, width)] = fromRGB(r, g, b);
+            distances[idx(i, j, width)] = std::numeric_limits<double>::max();
+        }
+    }
+
+    // sampling clusters
+    int p = 0;
+    for(int i = 0; i < height; i += S) {
+        for(int j = 0; j < width; j += S) {
+            centers[p] = ClusterCenter(imageLAB[idx(i, j, width)], i, j);
+            p++;
+        }
+    }
+
+    // set cluster centers to the lowest gradient position in a 3x3 neighborhood
+    // the code is hideous
+    for(int i = 0; i < k; i++) {
+
+        int x = centers[i].x;
+        int y = centers[i].y;
+
+        int p = 0;
+        int min_pos = 0;
+        double min = std::numeric_limits<double>::max();
+
+        for(int a = -1; a <= 1; a++) {
+
+            for(int b = -1; b <= 1; b++) {
+
+                int _x = x+a;
+                int _y = y+b;
+
+                if(_x > 0 && _x < height-1 && _y > 0 && _y < width-1) {
+                    double grad = distance2(imageLAB[idx(_x-1, _y, width)] - imageLAB[idx(_x+1, _y, width)], imageLAB[idx(_x, _y-1, width)] - imageLAB[idx(_x, _y+1, width)]);
+                    if(min > grad) {
+                        min = grad;
+                        min_pos = p;
+                    }
+                }
+
+                p++;
+
+            }
+
+        }
+
+        p = 0;
+        for(int a = -1; a <= 1; a++) {
+
+            for(int b = -1; b <= 1; b++) {
+
+                int _x = x+a;
+                int _y = y+b;
+
+                if(min_pos == p) {
+                    centers[i] = ClusterCenter(imageLAB[idx(_x, _y, width)], _x, _y);
+                }
+
+                p++;
+
+            }
+            
+        }
+
+    }
+
+    double max_color_distance = 30.0f;
+    double max_spatial_distance = S;
+    double tmp_color = std::numeric_limits<double>::min();
+    double tmp_spatial = std::numeric_limits<double>::min();
+
+    // Main loop
+    int iter = 0;
+    double max_error = std::numeric_limits<double>::min();
+    do {
+        max_error = std::numeric_limits<double>::min();
+
+        // Assignement
+        for(int c = 0; c < k; c++) {
+
+            for(int a = -1*S; a <= S; a++) {
+
+                int _x = floor(centers[c].x) + a;
+                if(_x < 0 || _x >= height) continue;
+
+                for(int b = -1*S; b <= S; b++) {
+
+                    int _y = floor(centers[c].y) + b;
+                    if(_y < 0 || _y >= width) continue;
+
+                    double D = distance(centers[c], imageLAB[idx(_x, _y, width)], _x, _y, max_spatial_distance, max_color_distance, tmp_color, tmp_spatial);
+
+                    if(distances[idx(_x, _y, width)] > D) {
+                        distances[idx(_x, _y, width)] = D;
+                        labels[idx(_x, _y, width)] = c;
+                    }
+
+                    clusters[c].push_back(idx(_x, _y, width));
+
+                }
+
+            }
+
+        }
+
+        double error;
+
+        // Update clusters
+        for(int c = 0; c < k; c++) {
+
+            ClusterCenter mean = ClusterCenter(PixelLAB(0., 0., 0.), 0., 0.);
+
+            int i = 0;
+            int size = clusters[c].size();
+            for(; i < size; i++) {
+
+                int id = clusters[c][i];
+                mean += ClusterCenter(imageLAB[id], id/width, id%width);
+
+            }
+            mean /= (double)i;
+
+            error = distance2(mean, centers[c]);
+            if(error > max_error) max_error = error;            
+
+            centers[c] = mean;
+            clusters[c].clear();
+
+        }
+
+        std::cout << "Iteration " << iter << ", max error: " << max_error << "\n";
+        max_color_distance = tmp_color;
+        max_spatial_distance = tmp_spatial;
+        tmp_color = std::numeric_limits<double>::min();
+        tmp_spatial = std::numeric_limits<double>::min();
+        iter++;
+
+    } while(max_error > MINCONV && iter < 15);
+
+    // post processing, to assign labels to the orphaned pixels
+    // connected component algorithm
+    bool orphan = false;
+    do {
+        for(int i = 0; i < N; i++) {
+
+            if(labels[i] == -1) {
+
+                std::vector<int> neighbors;
+
+                int x = i/width;
+                int y = i%width;
+
+                if(x > 0 && labels[idx(x-1, y, width)] != -1) neighbors.push_back(labels[idx(x-1, y, width)]);
+                if(x < height-1 && labels[idx(x+1, y, width)] != -1) neighbors.push_back(labels[idx(x+1, y, width)]);
+                if(y > 0 && labels[idx(x, y-1, width)] != -1) neighbors.push_back(labels[idx(x, y-1, width)]);
+                if(y < width-1 && labels[idx(x, y+1, width)] != -1) neighbors.push_back(labels[idx(x, y+1, width)]);
+
+                if(neighbors.empty()) {
+                    orphan = true;
+                    continue;
+                }
+
+                int min_label = 0;
+                double min = std::numeric_limits<double>::max();
+                int size = neighbors.size();
+                for(int j = 0; j < size; j++) {
+
+                    double dist = distance(centers[neighbors[j]], imageLAB[i], x, y, max_spatial_distance, max_color_distance);
+                    if(dist < min) {
+                        min = dist;
+                        min_label = neighbors[j];
+                    }
+
+                }
+
+                labels[i] = min_label;
+
+            }
+
+        }
+    } while(orphan);
+
+    for(int i = 0; i < k; i++) {
+        res_clusters.push_back(centers[i].color);
+    }
+
+    delete [] centers;
+    delete [] imageLAB;
+    delete [] distances;
+    delete [] clusters;
+    return labels;
+
+}
+
+int* SLICO(ImageBase &src, int k, std::vector<PixelLAB>& res_clusters) {
+
+    // Initialization
+    int height = src.getHeight();
+    int width = src.getWidth();
+    int N = src.getHeight()*src.getWidth();
+    int S = ceil(sqrt((double)N/k));
+
+    int* labels = new int[N];
+    double* distances = new double[N];
+    PixelLAB* imageLAB = new PixelLAB[N];
+    ClusterCenter* centers = new ClusterCenter[k];
+    std::vector<int>* clusters = new std::vector<int>[k];
+
+    memset(labels, -1, N*sizeof(int));
+
+    // CIELAB image from RGB image
+    for(int i = 0; i < height; i++) {
+        for(int j = 0; j < width; j++) {
+            int r = src[i*3][j*3];
+            int g = src[i*3][j*3+1];
+            int b = src[i*3][j*3+2];
+            imageLAB[idx(i, j, width)] = fromRGB(r, g, b);
+            distances[idx(i, j, width)] = std::numeric_limits<double>::max();
+        }
+    }
+
+    // sampling clusters
+    int p = 0;
+    for(int i = 0; i < height; i += S) {
+        for(int j = 0; j < width; j += S) {
+            centers[p] = ClusterCenter(imageLAB[idx(i, j, width)], i, j);
+            p++;
+        }
+    }
+
+    // set cluster centers to the lowest gradient position in a 3x3 neighborhood
+    // the code is hideous
+    for(int i = 0; i < k; i++) {
+
+        int x = centers[i].x;
+        int y = centers[i].y;
+
+        int p = 0;
+        int min_pos = 0;
+        double min = std::numeric_limits<double>::max();
+
+        for(int a = -1; a <= 1; a++) {
+
+            for(int b = -1; b <= 1; b++) {
+
+                int _x = x+a;
+                int _y = y+b;
+
+                if(_x > 0 && _x < height-1 && _y > 0 && _y < width-1) {
+                    double grad = distance2(imageLAB[idx(_x-1, _y, width)] - imageLAB[idx(_x+1, _y, width)], imageLAB[idx(_x, _y-1, width)] - imageLAB[idx(_x, _y+1, width)]);
+                    if(min > grad) {
+                        min = grad;
+                        min_pos = p;
+                    }
+                }
+
+                p++;
+
+            }
+
+        }
+
+        p = 0;
+        for(int a = -1; a <= 1; a++) {
+
+            for(int b = -1; b <= 1; b++) {
+
+                int _x = x+a;
+                int _y = y+b;
+
+                if(min_pos == p) {
+                    centers[i] = ClusterCenter(imageLAB[idx(_x, _y, width)], _x, _y);
+                }
+
+                p++;
+
+            }
+            
+        }
+
+    }
+
+    double max_color_distance = 30.0f;
+    double max_spatial_distance = S;
+    double tmp_color = std::numeric_limits<double>::min();
+    double tmp_spatial = std::numeric_limits<double>::min();
+
+    // Main loop
+    int iter = 0;
+    double max_error = std::numeric_limits<double>::min();
+    do {
+        max_error = std::numeric_limits<double>::min();
+
+        // Assignement
+        for(int c = 0; c < k; c++) {
+
+            for(int a = -1*S; a <= S; a++) {
+
+                int _x = floor(centers[c].x) + a;
+                if(_x < 0 || _x >= height) continue;
+
+                for(int b = -1*S; b <= S; b++) {
+
+                    int _y = floor(centers[c].y) + b;
+                    if(_y < 0 || _y >= width) continue;
+
+                    double D = distance(centers[c], imageLAB[idx(_x, _y, width)], _x, _y, S, max_color_distance, tmp_color, tmp_spatial);
+
+                    if(distances[idx(_x, _y, width)] > D) {
+                        distances[idx(_x, _y, width)] = D;
+                        labels[idx(_x, _y, width)] = c;
+                    }
+
+                    clusters[c].push_back(idx(_x, _y, width));
+
+                }
+
+            }
+
+        }
+
+        double error;
+
+        // Update clusters
+        for(int c = 0; c < k; c++) {
+
+            ClusterCenter mean = ClusterCenter(PixelLAB(0., 0., 0.), 0., 0.);
+
+            int i = 0;
+            int size = clusters[c].size();
+            for(; i < size; i++) {
+
+                int id = clusters[c][i];
+                mean += ClusterCenter(imageLAB[id], id/width, id%width);
+
+            }
+            mean /= (double)i;
+
+            error = distance2(mean, centers[c]);
+            if(error > max_error) max_error = error;            
+
+            centers[c] = mean;
+            clusters[c].clear();
+
+        }
+
+        std::cout << "Iteration " << iter << ", max error: " << max_error << "\n";
+        max_color_distance = tmp_color;
+        max_spatial_distance = tmp_spatial;
+        tmp_color = std::numeric_limits<double>::min();
+        tmp_spatial = std::numeric_limits<double>::min();
+        iter++;
+
+    } while(max_error > MINCONV && iter < 15);
+
+    // post processing, to assign labels to the orphaned pixels
+    // connected component algorithm
+    bool orphan = false;
+    do {
+        for(int i = 0; i < N; i++) {
+
+            if(labels[i] == -1) {
+
+                std::vector<int> neighbors;
+
+                int x = i/width;
+                int y = i%width;
+
+                if(x > 0 && labels[idx(x-1, y, width)] != -1) neighbors.push_back(labels[idx(x-1, y, width)]);
+                if(x < height-1 && labels[idx(x+1, y, width)] != -1) neighbors.push_back(labels[idx(x+1, y, width)]);
+                if(y > 0 && labels[idx(x, y-1, width)] != -1) neighbors.push_back(labels[idx(x, y-1, width)]);
+                if(y < width-1 && labels[idx(x, y+1, width)] != -1) neighbors.push_back(labels[idx(x, y+1, width)]);
+
+                if(neighbors.empty()) {
+                    orphan = true;
+                    continue;
+                }
+
+                int min_label = 0;
+                double min = std::numeric_limits<double>::max();
+                int size = neighbors.size();
+                for(int j = 0; j < size; j++) {
+
+                    double dist = distance(centers[neighbors[j]], imageLAB[i], x, y, S, max_color_distance);
                     if(dist < min) {
                         min = dist;
                         min_label = neighbors[j];
