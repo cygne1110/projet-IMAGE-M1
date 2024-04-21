@@ -1,6 +1,10 @@
 #include "slic.h"
 #include "cielab.h"
 
+struct Palette {
+	int r, g, b;
+};
+
 int idx(int i, int j, int w) {
     return i*w+j;
 }
@@ -75,6 +79,9 @@ int* SLIC(ImageBase &src, int k, int m, std::vector<PixelLAB>& res_clusters) {
     ClusterCenter* centers = new ClusterCenter[k];
     std::vector<int>* clusters = new std::vector<int>[k];
 
+    std::vector<Palette> colorsPalette;
+    std::vector<Palette> palette;
+
     memset(labels, -1, N*sizeof(int));
 
     // CIELAB image from RGB image
@@ -85,8 +92,46 @@ int* SLIC(ImageBase &src, int k, int m, std::vector<PixelLAB>& res_clusters) {
             int b = src[i*3][j*3+2];
             imageLAB[idx(i, j, width)] = fromRGB(r, g, b);
             distances[idx(i, j, width)] = std::numeric_limits<double>::max();
+
+            // palette compression
+            Palette color;
+            color.r = r;
+            color.g = g;
+            color.b = b;
+            colorsPalette.push_back(color);
         }
     }
+
+    // palette initialization
+    for(Palette cp : colorsPalette){
+        
+        bool uniquecolor = true;
+        
+        for(Palette p : palette){
+            if(cp.r == p.r and cp.g == p.g and cp.b == p.b){
+                uniquecolor = false;
+                break;
+            }
+        }
+
+        if(uniquecolor == true){
+            palette.push_back(cp);
+        }
+    }
+
+    // palette image
+    ImageBase paletteImg(int(sqrt(palette.size()) + 0.5), int(sqrt(palette.size()) + 0.5), src.getColor());
+
+    for(int i = 0; i < paletteImg.getHeight(); i++){
+        for(int j = 0; j < paletteImg.getWidth(); j++){
+            paletteImg[i*3][j*3]     = palette[i * paletteImg.getWidth() + j].r;
+            paletteImg[i*3][j*3 + 1] = palette[i * paletteImg.getWidth() + j].g;
+            paletteImg[i*3][j*3 + 2] = palette[i * paletteImg.getWidth() + j].b;
+        }
+    }
+
+    paletteImg.save("out/palette.ppm");
+
 
     // sampling clusters
     int p = 0;
