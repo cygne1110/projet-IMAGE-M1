@@ -1,5 +1,6 @@
 #include "slic.h"
 #include "cielab.h"
+#include "compressionPalette.h"
 
 #include <chrono>
 #include <fstream>
@@ -131,6 +132,11 @@ int main(int argc, char* argv[]) {
         draw_regions(src, labels, centers, N, K);
 
         src.save("out/test.ppm");
+
+        // palette compression
+        ImageBase imgRegions;
+        imgRegions.load("out/regions.ppm");
+        compressionPalette(imgRegions, imgRegions.getHeight(), imgRegions.getWidth(), "out/paletteRegions.ppm");
 
         delete [] labels;
 
